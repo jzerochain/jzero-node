@@ -30,11 +30,10 @@ services:
       - ./config/metadata:/config
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8545 -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:8545 || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
 
   beacon:
     image: sigp/lighthouse:latest-unstable
@@ -68,9 +67,6 @@ services:
       - ./config/metadata:/config
       - ./data/lighthouse:/root/.lighthouse/
     restart: unless-stopped
-    depends_on:
-      reth:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5052/eth/v1/node/health || exit 1"]
       interval: 30s
