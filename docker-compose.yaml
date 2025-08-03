@@ -1,0 +1,85 @@
+
+services:
+  reth:
+    image: ghcr.io/paradigmxyz/reth
+    command:
+      - node
+      - --chain=/config/genesis.json
+      - --datadir=/execution-data 
+      - --http 
+      - --http.corsdomain="*"
+      - --http.addr=0.0.0.0
+      - --http.api=all
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=8546
+      - --ws.origins="*"
+      - --ws.api=all
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=8551
+      - --authrpc.jwtsecret=/config/jwtsecret
+      - --bootnodes=$EL_BOOTNODE
+      - --trusted-peers=$EL_BOOTNODE
+
+    ports:
+      - 8545:8545       # RPC
+      - 8546:8546       # RPC
+      - 30303:30303
+    volumes:
+      - ./data/execution-data:/execution-data
+      - ./config/metadata:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8545 -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  beacon:
+    image: sigp/lighthouse:latest-unstable
+    command:
+      - lighthouse
+      - beacon_node
+      - --datadir=/consensus-data
+      - --disable-peer-scoring
+      - --disable-packet-filter
+      - --enable-private-discovery
+      - --staking
+      - --http
+      - --http-address=0.0.0.0
+      - --http-port=5052
+      - --validator-monitor-auto
+      - --http-allow-origin=*
+      - --listen-address=0.0.0.0
+      - --enr-address=${NODE_PUBLIC_IP}
+      - --enr-tcp-port=9000
+      - --enr-udp-port=9000
+      - --port=9000
+      - --target-peers=100
+      - --testnet-dir=/config
+      - --execution-endpoints=http://reth:8551
+      - --jwt-secrets=/config/jwtsecret
+      - --suggested-fee-recipient=${FEE_RECIPIENT}
+      - --allow-insecure-genesis-sync
+      - --boot-nodes=${CL_BOOTNODE}
+    volumes:
+      - ./data/consensus-data:/consensus-data
+      - ./config/metadata:/config
+      - ./data/lighthouse:/root/.lighthouse/
+    restart: unless-stopped
+    depends_on:
+      reth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5052/eth/v1/node/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
